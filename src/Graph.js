@@ -5,49 +5,64 @@ import * as d3 from "d3";
 // console.log(algorithm());
 
 class Graph extends Component {
-  // constructor(props) {
-  //   super(props);
-  //   this.createGraph = this.createGraph.bind(this);
-  // }
+  constructor(props) {
+    super(props);
+    this.svg = null;
+    this.line = null;
+    this.padding = 20; //SVG to window edges
+    this.margin = { top: 30, right: 50, bottom: 70, left: 70 }; // graph to svg edges
+    this.width = window.innerWidth - (this.margin.left + this.margin.right + this.padding * 2); // Use the window's width
+    this.height = window.innerHeight - (this.margin.top + this.margin.bottom); // Use the window's height
+    this.createGraph = this.createGraph.bind(this);
+    this.updateGraph = this.updateGraph.bind(this);
+    this.state = {
+      currentMarginalHour: 0
+    }
+  }
 
   componentDidMount() {
-    this.createGraph()
+    this.timer = setInterval(()=>{
+      this.incrementMarginalHour()
+    }, 1000)
+    this.createGraph();
+    this.updateGraph();
   }
-  // componentDidUpdate() {
-  //   this.createGraph()
-  // }
+  componentDidUpdate() {
+    this.updateGraph();
+  }
 
+  componentWillUnmount() {
+    clearInterval(this.timer);
+  }
+
+  incrementMarginalHour(){
+    const nextMarginalHour = (this.state.currentMarginalHour + 1) % this.props.data.length;
+    this.setState({
+      currentMarginalHour: nextMarginalHour
+    });
+  }
   createGraph(){
-    const segments = (values) => {
-      let i = 0;
-      let n = values.length;
-      let segments = new Array(n - 1);
+    // Add SVG and put on this for later use
+    this.svg = d3
+      .select(this.node)
+      .append("svg")
+      .attr("width", this.width + this.margin.left + this.margin.right)
+      .attr("height", this.height + this.margin.top + this.margin.bottom);
 
-      while (++i < n) {
-        segments[i - 1] = [values[i - 1], values[i]];
-      }
-      return segments;
-    };
-
-    const padding = 20; //SVG to window edges
-    const margin = { top: 30, right: 50, bottom: 70, left: 70 }, // graph to svg edges
-      width = window.innerWidth - (margin.left + margin.right + padding * 2), // Use the window's width
-      height = window.innerHeight - (margin.top + margin.bottom); // Use the window's height
-
-    // 5. X scale will use the index of our data
-    const xScale = d3
+    // Add xScale
+    let xScale = d3
       .scaleLinear()
       .domain([0, 24]) // input
-      .range([0, width]); // output
+      .range([0, this.width]); // output
 
-    // 6. Y scale will use the randomly generate number
-    const yScale = d3
+    // Add yScale
+    let yScale = d3
       .scaleLinear()
       .domain([0, 100]) // input
-      .range([height, 0]); // output
+      .range([this.height, 0]); // output
 
-    // 7. d3's line generator
-    let line = d3
+    // d3's line generator - takes data, applies scale, returns line
+    this.line = d3
       .line()
       .x(function(d) {
         return xScale(d.x);
@@ -56,40 +71,78 @@ class Graph extends Component {
         return yScale(d.y);
       }); // set the y values for the line generator
 
-    var dataset = [];
-
-    this.props.data.forEach((d, index) => {
-      let obj = {
-        y: parseFloat(d.transaction === "sell" ? -1 * d.price : d.price),
-        transaction: d.transaction
-      };
-      dataset.push({ ...obj, x: parseFloat(d.operatingHour) - 1 });
-      dataset.push({ ...obj, x: parseFloat(d.operatingHour) });
+    // transform dataset - data comes in with sold as negative numbers, to make cash flow easy to calculate/mimic the general financial practices. But need to graph as positive numbers. 
+    var dataSet = [];
+    this.props.data.forEach(marginalHour => {
+      var processedMarginalHour = [];
+      marginalHour.forEach((d, index) => {
+        let obj = {
+          y: parseFloat(d.transaction === "sell" ? -1 * d.price : d.price),
+          transaction: d.transaction
+        };
+        processedMarginalHour.push({ ...obj, x: parseFloat(d.operatingHour) - 1 });
+        processedMarginalHour.push({ ...obj, x: parseFloat(d.operatingHour) });
+      });
+      dataSet.push(processedMarginalHour);
     });
+    this.dataSet = dataSet
 
-    // 1. Add the SVG to the page and employ #2
-    var svg = d3
-      .select(this.node)
-      .append("svg")
-      .attr("width", width + margin.left + margin.right)
-      .attr("height", height + margin.top + margin.bottom);
+    // 3. Call the x axis in a group tag
+    let xAxis = this.svg
+      .append("g")
+      .attr("class", "x axis")
+      .attr("transform", `translate(${this.margin.left},${this.margin.top + this.height})`)
+      .call(d3.axisBottom(xScale)); // Create an axis component with d3.axisBottom
 
-    // // var g = svg.append("g")
-    // //   .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    // 4. Call the y axis in a group tag
+    let yAxis = this.svg
+      .append("g")
+      .attr("class", "y axis")
+      .attr("transform", `translate(${this.margin.left},${this.margin.top})`)
+      .call(d3.axisLeft(yScale)); // Create an axis component with d3.axisLeft
 
-    var g = svg
-      .selectAll("g")
-      .data([dataset])
+    // now add titles to the axes
+    let yAxisLabel = this.svg
+      .append("text")
+      .attr("text-anchor", "middle") // this makes it easy to centre the text as the transform is applied to the anchor
+      .attr(
+        "transform",
+        "translate(" +
+          this.margin.left / 2 +
+          "," +
+          (this.height / 2 + this.margin.top) +
+          ")rotate(-90)"
+      ) // text is drawn off the screen top left, move down and out and rotate
+      .text("Dollars/megawatt-hour");
+
+    let xAxisLabel = this.svg
+      .append("text")
+      .attr("text-anchor", "middle") // this makes it easy to centre the text as the transform is applied to the anchor
+      .attr(
+        "transform",
+        "translate(" +
+          (this.width / 2 + this.margin.left) +
+          "," +
+          (this.height + this.margin.top + this.margin.bottom / 2) +
+          ")"
+      ) 
+      .text("Hour");
+
+    // Initially we need .enter().append() to produce the g.data items to translate - later we will do this directly on the selection, b/c the elements we need already exist. 
+    var g = this.svg
+      .selectAll("g.data")
+      .data([this.dataSet[this.state.currentMarginalHour]])
       .enter()
       .append("g")
-      .attr("transform", `translate(${margin.left},${margin.top})`);
+      .attr("class", "data")
+      .attr("transform", `translate(${this.margin.left},${this.margin.top})`);
 
     var path = g
       .selectAll("path")
-      .data(segments)
+      .data(this.segments)
       .enter()
       .append("path")
-      .attr("d", line)
+      .attr("d", this.line)
       .attr("stroke-width", 2)
       .style("stroke", function(d) {
         if (d[0].transaction === d[1].transaction && d[0].transaction) {
@@ -99,49 +152,38 @@ class Graph extends Component {
         }
       });
 
-    // 3. Call the x axis in a group tag
-    let xAxis = svg
-      .append("g")
-      .attr("class", "x axis")
-      .attr("transform", `translate(${margin.left},${margin.top + height})`)
-      .call(d3.axisBottom(xScale)); // Create an axis component with d3.axisBottom
+  }
 
-    // 4. Call the y axis in a group tag
-    let yAxis = svg
-      .append("g")
-      .attr("class", "y axis")
-      .attr("transform", `translate(${margin.left},${margin.top})`)
-      .call(d3.axisLeft(yScale)); // Create an axis component with d3.axisLeft
+  segments(values){
+    let i = 0;
+    let n = values.length;
+    let segments = new Array(n - 1);
 
-    // now add titles to the axes
-    let yAxisLabel = svg
-      .append("text")
-      .attr("text-anchor", "middle") // this makes it easy to centre the text as the transform is applied to the anchor
-      .attr(
-        "transform",
-        "translate(" +
-          margin.left / 2 +
-          "," +
-          (height / 2 + margin.top) +
-          ")rotate(-90)"
-      ) // text is drawn off the screen top left, move down and out and rotate
-      .text("Dollars/megawatt-hour");
-
-    let xAxisLabel = svg
-      .append("text")
-      .attr("text-anchor", "middle") // this makes it easy to centre the text as the transform is applied to the anchor
-      .attr(
-        "transform",
-        "translate(" +
-          (width / 2 + margin.left) +
-          "," +
-          (height + margin.top + margin.bottom / 2) +
-          ")"
-      ) 
-      .text("Hour");
+    while (++i < n) {
+      segments[i - 1] = [values[i - 1], values[i]];
     }
+    return segments;
+  };
+
+  updateGraph(){
+    debugger;
+
+  var g = this.svg
+    .selectAll("g.data")
+    .data([this.dataSet[this.state.currentMarginalHour]])
+
+  var path = g
+    .selectAll("path")
+    .data(this.segments)
+    .style("stroke", function(d) {
+      if (d[0].transaction === d[1].transaction && d[0].transaction) {
+        return d[0].transaction === "buy" ? "blue" : "red";
+      } else {
+        return "gray";
+      }
+    });
+  }
   render() {
-    
     return (
       <div ref={node => this.node = node}>
       </div>

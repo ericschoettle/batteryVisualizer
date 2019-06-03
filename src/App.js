@@ -1,6 +1,5 @@
 import React, { Component } from 'react';
 import './App.css';
-import './Graph.js'
 import Graph from './Graph.js';
 // import algorithm from './arbitrage-algorithm.js';
 
@@ -41,7 +40,8 @@ class App extends Component {
 
     return (
       <div className="App">
-        {graphs}
+        <Graph data ={data}></Graph>
+        {/* {graphs} */}
       </div>
     );
   }
