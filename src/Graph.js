@@ -77,7 +77,7 @@ class Graph extends Component {
       var processedMarginalHour = [];
       marginalHour.forEach((d, index) => {
         let obj = {
-          y: parseFloat(d.transaction === "sell" ? -1 * d.price : d.price),
+          y: parseFloat(d.price),
           transaction: d.transaction
         };
         processedMarginalHour.push({ ...obj, x: parseFloat(d.operatingHour) - 1 });
