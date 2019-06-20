@@ -21,6 +21,7 @@ class Graph extends Component {
   }
 
   componentDidMount() {
+    console.log(this.state.maxMarginalHour)
     this.timer = setInterval(()=>{
       this.incrementMarginalHour()
     }, 1000)
@@ -36,10 +37,9 @@ class Graph extends Component {
   }
 
   incrementMarginalHour(){
-    const nextMarginalHour = (this.state.currentMarginalHour + 1) % this.props.data.length;
-    this.setState({
-      currentMarginalHour: nextMarginalHour
-    });
+    this.setState((state, props)=>({
+      currentMarginalHour: (state.currentMarginalHour + 1) % (props.maxMarginalHour + 1 || props.data.length)
+    }));
   }
   createGraph(){
     // Add SVG and put on this for later use
@@ -166,22 +166,20 @@ class Graph extends Component {
   };
 
   updateGraph(){
-    debugger;
+    var g = this.svg
+      .selectAll("g.data")
+      .data([this.dataSet[this.state.currentMarginalHour]])
 
-  var g = this.svg
-    .selectAll("g.data")
-    .data([this.dataSet[this.state.currentMarginalHour]])
-
-  var path = g
-    .selectAll("path")
-    .data(this.segments)
-    .style("stroke", function(d) {
-      if (d[0].transaction === d[1].transaction && d[0].transaction) {
-        return d[0].transaction === "buy" ? "blue" : "red";
-      } else {
-        return "gray";
-      }
-    });
+    var path = g
+      .selectAll("path")
+      .data(this.segments)
+      .style("stroke", function(d) {
+        if (d[0].transaction === d[1].transaction && d[0].transaction) {
+          return d[0].transaction === "buy" ? "blue" : "red";
+        } else {
+          return "gray";
+        }
+      });
   }
   render() {
     return (

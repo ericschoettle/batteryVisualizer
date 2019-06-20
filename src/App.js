@@ -1,12 +1,25 @@
 import React, { Component } from 'react';
 import './App.css';
 import Graph from './Graph.js';
+import Form from './Form.js'
 // import algorithm from './arbitrage-algorithm.js';
 
 // console.log(algorithm());
 
 
 class App extends Component {
+  constructor(props){
+    super(props);
+    this.state = {
+      maxMarginalHour: 1
+    }
+
+    this.handleChange = this.handleChange.bind(this); // no performance hit using this, and don't have to worry about binding this anywhere else. 
+  }
+
+  handleChange(event){
+    this.setState({maxMarginalHour: parseInt(event.target.value)})
+  }
   render() {
     let data = [];
 
@@ -37,11 +50,12 @@ class App extends Component {
     let graphs = data.map((dataSet)=>{
       return <Graph data={dataSet}></Graph>
     })
+    console.log(this.state.maxMarginalHour)
 
     return (
       <div className="App">
-        <Graph data ={data}></Graph>
-        {/* {graphs} */}
+        <Form handleChange={this.handleChange}  maxMarginalHour={this.state.maxMarginalHour} formMaxMarginalHours={data.length -1}></Form>
+        <Graph data={data} maxMarginalHour={this.state.maxMarginalHour}></Graph>
       </div>
     );
   }
