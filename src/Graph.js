@@ -13,15 +13,18 @@ class Graph extends Component {
     this.margin = { top: 30, right: 50, bottom: 70, left: 70 }; // graph to svg edges
     this.width = window.innerWidth - (this.margin.left + this.margin.right + this.padding * 2); // Use the window's width
     this.height = window.innerHeight - (this.margin.top + this.margin.bottom); // Use the window's height
+
+    // this binding
     this.createGraph = this.createGraph.bind(this);
     this.updateGraph = this.updateGraph.bind(this);
+    this.strokeColor = this.strokeColor.bind(this);
+    // set state
     this.state = {
-      currentMarginalHour: 0
+      currentMarginalHour: 2
     }
   }
 
   componentDidMount() {
-    console.log(this.state.maxMarginalHour)
     this.timer = setInterval(()=>{
       this.incrementMarginalHour()
     }, 1000)
@@ -71,19 +74,17 @@ class Graph extends Component {
         return yScale(d.y);
       }); // set the y values for the line generator
 
-    // transform dataset - data comes in with sold as negative numbers, to make cash flow easy to calculate/mimic the general financial practices. But need to graph as positive numbers. 
+    // Need two points to define a line segment, so double the data (and cut fat)
     var dataSet = [];
-    this.props.data.forEach(marginalHour => {
-      var processedMarginalHour = [];
-      marginalHour.forEach((d, index) => {
-        let obj = {
-          y: parseFloat(d.price),
-          transaction: d.transaction
-        };
-        processedMarginalHour.push({ ...obj, x: parseFloat(d.operatingHour) - 1 });
-        processedMarginalHour.push({ ...obj, x: parseFloat(d.operatingHour) });
-      });
-      dataSet.push(processedMarginalHour);
+
+    this.props.data.forEach((d) => {
+      let obj = {
+        y: parseFloat(d.price),
+        transaction: d.transaction,
+        marginalHour: d.marginalHour
+      };
+      dataSet.push({ ...obj, x: parseFloat(d.operatingHour) - 1 });
+      dataSet.push({ ...obj, x: parseFloat(d.operatingHour) });
     });
     this.dataSet = dataSet
 
@@ -131,7 +132,7 @@ class Graph extends Component {
     // Initially we need .enter().append() to produce the g.data items to translate - later we will do this directly on the selection, b/c the elements we need already exist. 
     var g = this.svg
       .selectAll("g.data")
-      .data([this.dataSet[this.state.currentMarginalHour]])
+      .data([this.dataSet])
       .enter()
       .append("g")
       .attr("class", "data")
@@ -144,16 +145,22 @@ class Graph extends Component {
       .append("path")
       .attr("d", this.line)
       .attr("stroke-width", 2)
-      .style("stroke", function(d) {
-        if (d[0].transaction === d[1].transaction && d[0].transaction) {
-          return d[0].transaction === "buy" ? "blue" : "red";
-        } else {
-          return "gray";
-        }
-      });
+      .style("stroke", this.strokeColor);
 
   }
 
+  strokeColor(d){
+    if (d[0].transaction === d[1].transaction 
+      && d[0].transaction 
+      && d[0].marginalHour < this.state.currentMarginalHour) 
+    {
+      return d[0].transaction === "buy" ? "blue" : "red";
+    } else {
+      return "gray";
+    }
+  }
+
+  // Takes data of all nodes in line and builds segments (an array of the two points)
   segments(values){
     let i = 0;
     let n = values.length;
@@ -166,20 +173,10 @@ class Graph extends Component {
   };
 
   updateGraph(){
-    var g = this.svg
+    this.svg
       .selectAll("g.data")
-      .data([this.dataSet[this.state.currentMarginalHour]])
-
-    var path = g
       .selectAll("path")
-      .data(this.segments)
-      .style("stroke", function(d) {
-        if (d[0].transaction === d[1].transaction && d[0].transaction) {
-          return d[0].transaction === "buy" ? "blue" : "red";
-        } else {
-          return "gray";
-        }
-      });
+      .style("stroke", this.strokeColor)
   }
   render() {
     return (
